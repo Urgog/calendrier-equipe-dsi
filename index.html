@@ -87,10 +87,33 @@
     </div>
 
     <sc-for list="{{ people }}" as="person" hint-placeholder-count="8">
-      <div style="display:grid; grid-template-columns:240px repeat(5, 1fr) 44px; border-top:1px solid {{ theme.borderLight }};">
-        <div style="padding:14px 20px; display:flex; align-items:center; gap:12px; min-width:0;">
-          <div style="width:36px; height:36px; border-radius:50%; background:{{ person.avatarColor }}; color:white; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; flex-shrink:0;">{{ person.initials }}</div>
-          <input class="name-input" type="text" value="{{ person.name }}" onChange="{{ person.onNameChange }}" style="color:{{ theme.text }};"></input>
+      <div draggable="true" onDragStart="{{ person.onDragStart }}" onDragOver="{{ person.onDragOver }}" onDragEnter="{{ person.onDragEnter }}" onDragEnd="{{ person.onDragEnd }}" onDrop="{{ person.onDrop }}" style="display:grid; grid-template-columns:240px repeat(5, 1fr) 44px; border-top:2px solid {{ person.rowBorderColor }}; opacity:{{ person.rowOpacity }}; cursor:grab; transition:border-color 0.1s;">
+        <div style="padding:14px 20px; display:flex; align-items:center; gap:12px; min-width:0; position:relative;">
+          <span style="font-size:13px; color:{{ theme.muted }}; cursor:grab;">⋮⋮</span>
+          <div onClick="{{ person.onAvatarClick }}" style="width:36px; height:36px; border-radius:50%; background:{{ person.avatarColor }}; color:white; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; flex-shrink:0; cursor:pointer;">
+            <sc-if value="{{ person.icon }}" hint-placeholder-val="{{ false }}">{{ person.icon }}</sc-if>
+            <sc-if value="{{ person.iconEmpty }}" hint-placeholder-val="{{ true }}">{{ person.initials }}</sc-if>
+          </div>
+          <input class="name-input" type="text" value="{{ person.name }}" onChange="{{ person.onNameChange }}" onBlur="{{ person.onNameBlur }}" style="color:{{ theme.text }};"></input>
+          <sc-if value="{{ person.isEditing }}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute; z-index:10; top:100%; left:20px; margin-top:4px; padding:12px; border-radius:10px; background:{{ theme.card }}; border:1px solid {{ theme.border }}; box-shadow:0 6px 20px rgba(0,0,0,0.15); width:220px;">
+              <div style="font-size:11px; color:{{ theme.muted2 }}; margin-bottom:6px;">Couleur</div>
+              <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
+                <sc-for list="{{ person.colorSwatches }}" as="sw" hint-placeholder-count="7">
+                  <button onClick="{{ sw.onSelect }}" style="width:22px; height:22px; border-radius:50%; border:none; background:{{ sw.color }}; box-shadow:{{ sw.ring }}; cursor:pointer;"></button>
+                </sc-for>
+              </div>
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                <div style="font-size:11px; color:{{ theme.muted2 }};">Icône</div>
+                <button onClick="{{ person.onResetIcon }}" style="font-size:11px; border:none; background:transparent; color:{{ theme.muted2 }}; text-decoration:underline; cursor:pointer; padding:0;">Revenir aux lettres</button>
+              </div>
+              <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                <sc-for list="{{ person.iconChoices }}" as="ic" hint-placeholder-count="6">
+                  <button onClick="{{ ic.onSelect }}" style="width:24px; height:24px; border-radius:6px; border:none; background:transparent; font-size:14px; cursor:pointer;">{{ ic.icon }}</button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
         </div>
         <sc-for list="{{ person.days }}" as="cell" hint-placeholder-count="5">
           <div style="padding:10px; position:relative; border-left:1px solid {{ theme.borderLight }};">
@@ -140,6 +163,7 @@ const DAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi'];
 const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const PEOPLE_SEED = ['Nadège','Thomas C','Thomas R','Manon','Simon','Pierrick','Damien','Laure','Yannick'];
 const AVATAR_COLORS = ['oklch(0.6 0.1 20)','oklch(0.6 0.1 60)','oklch(0.58 0.1 145)','oklch(0.58 0.1 195)','oklch(0.58 0.1 250)','oklch(0.58 0.1 290)','oklch(0.58 0.1 330)'];
+const ICON_CHOICES = ['','😀','🐱','🐶','🦊','🐼','🌟','🔥','🌈','⚡','🎯','🚀'];
 
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyD2FtcLPjA2PjaQBRLwnLsdAPXiatKZ_CQ",
@@ -197,6 +221,12 @@ class Component extends DCLogic {
     customStatuses: {},
     recurring: {},
     confirmCell: null,
+    order: [],
+    editingPersonId: null,
+    dragId: null,
+    dragOverId: null,
+    liveOrder: null,
+    nameDrafts: {},
   };
 
   componentDidUpdate() {
@@ -213,12 +243,25 @@ class Component extends DCLogic {
         const data = snap.val();
         if (!data) {
           const seedPeople = {};
-          PEOPLE_SEED.forEach((name, i) => { seedPeople[i] = name; });
-          this.dbRef.set({ people: seedPeople, nextPersonId: PEOPLE_SEED.length, statuses: {}, customStatuses: {}, recurring: {} });
+          PEOPLE_SEED.forEach((name, i) => { seedPeople[i] = { name }; });
+          const order = PEOPLE_SEED.map((_, i) => String(i));
+          this.dbRef.set({ people: seedPeople, nextPersonId: PEOPLE_SEED.length, statuses: {}, customStatuses: {}, recurring: {}, order });
           return;
         }
+        const rawPeople = data.people || {};
+        const people = {};
+        Object.keys(rawPeople).forEach(id => {
+          const v = rawPeople[id];
+          const hadName = typeof v === 'string' ? !!v : !!(v && v.name);
+          const name = typeof v === 'string' ? v : (v && v.name) || 'Sans nom';
+          people[id] = typeof v === 'string' ? { name } : { ...v, name };
+          if (!hadName && this.dbRef) this.dbRef.child('people/' + id + '/name').set(name);
+        });
+        const order = (data.order && data.order.length ? data.order : Object.keys(people));
+        Object.keys(people).forEach(id => { if (order.indexOf(id) === -1) order.push(id); });
         this.setState({
-          people: data.people || {},
+          people,
+          order,
           nextPersonId: data.nextPersonId || PEOPLE_SEED.length,
           statuses: data.statuses || {},
           customStatuses: data.customStatuses || {},
@@ -247,19 +290,64 @@ class Component extends DCLogic {
 
   addPerson = () => {
     if (!this.dbRef) return;
-    const id = this.state.nextPersonId;
-    this.dbRef.child('people/' + id).set('Nouveau membre');
-    this.dbRef.child('nextPersonId').set(id + 1);
+    const id = String(this.state.nextPersonId);
+    this.dbRef.child('people/' + id).set({ name: 'Nouveau membre' });
+    this.dbRef.child('nextPersonId').set(this.state.nextPersonId + 1);
+    this.dbRef.child('order').set([...this.state.order, id]);
   };
 
   removePerson(id) {
     if (!this.dbRef) return;
     this.dbRef.child('people/' + id).remove();
+    this.dbRef.child('order').set(this.state.order.filter(o => o !== id));
   }
 
-  renamePerson(id, name) {
+  onNameDraftChange(id, value) {
+    this.setState(s => ({ nameDrafts: { ...s.nameDrafts, [id]: value } }));
+  }
+
+  commitName(id) {
+    const draft = this.state.nameDrafts[id];
+    if (draft === undefined) return;
+    const finalName = draft.trim() === '' ? 'Sans nom' : draft;
+    if (this.dbRef) this.dbRef.child('people/' + id + '/name').set(finalName);
+    this.setState(s => {
+      const drafts = { ...s.nameDrafts };
+      delete drafts[id];
+      return { nameDrafts: drafts };
+    });
+  }
+
+  setPersonColor(id, color) {
     if (!this.dbRef) return;
-    this.dbRef.child('people/' + id).set(name);
+    this.dbRef.child('people/' + id + '/color').set(color);
+  }
+
+  setPersonIcon(id, icon) {
+    if (!this.dbRef) return;
+    if (icon) this.dbRef.child('people/' + id + '/icon').set(icon);
+    else this.dbRef.child('people/' + id + '/icon').remove();
+  }
+
+  toggleEditPerson(id) {
+    this.setState(s => ({ editingPersonId: s.editingPersonId === id ? null : id }));
+  }
+
+  onDragStart(id) { this.setState({ dragId: id, liveOrder: [...this.state.order] }); }
+  onDragEnter(targetId) {
+    const { dragId, liveOrder } = this.state;
+    if (!dragId || dragId === targetId || !liveOrder) return;
+    const newOrder = liveOrder.filter(o => o !== dragId);
+    const idx = newOrder.indexOf(targetId);
+    newOrder.splice(idx, 0, dragId);
+    this.setState({ liveOrder: newOrder, dragOverId: targetId });
+  }
+  onDragEnd() { this.setState({ dragId: null, dragOverId: null, liveOrder: null }); }
+  onDropOn(targetId) {
+    const { dragId, liveOrder } = this.state;
+    if (!dragId || !this.dbRef) { this.setState({ dragId: null, dragOverId: null, liveOrder: null }); return; }
+    this.dbRef.child('order').set(liveOrder || this.state.order);
+    this.setState({ dragId: null, dragOverId: null, liveOrder: null });
   }
 
   setStatus(personId, dayIdx, value) {
@@ -307,9 +395,25 @@ class Component extends DCLogic {
       ? `${monday.getDate()} – ${friday.getDate()} ${MONTHS[friday.getMonth()]} ${friday.getFullYear()}`
       : `${monday.getDate()} ${MONTHS[monday.getMonth()]} – ${friday.getDate()} ${MONTHS[friday.getMonth()]} ${friday.getFullYear()}`;
 
-    const peopleIds = Object.keys(this.state.people);
+    const displayOrder = this.state.liveOrder || this.state.order;
+    const peopleIds = displayOrder.filter(id => this.state.people[id]);
     const people = peopleIds.map((id, pi) => {
-      const name = this.state.people[id];
+      const p = this.state.people[id] || {};
+      const draft = this.state.nameDrafts[id];
+      const name = draft !== undefined ? draft : (p.name || 'Sans nom');
+      const avatarColor = p.color || AVATAR_COLORS[pi % AVATAR_COLORS.length];
+      const icon = p.icon || '';
+      const isEditing = this.state.editingPersonId === id;
+      const colorSwatches = AVATAR_COLORS.map(c => ({
+        color: c,
+        ring: c === avatarColor ? '0 0 0 2px white, 0 0 0 4px oklch(0.5 0.05 250)' : 'none',
+        onSelect: () => this.setPersonColor(id, c),
+      }));
+      const iconChoices = ICON_CHOICES.map(ic => ({
+        icon: ic || '🔤',
+        selected: ic === icon,
+        onSelect: () => this.setPersonIcon(id, ic),
+      }));
       const days = weekDays.map((wd, di) => {
         const key = this.state.weekOffset + '_' + id + '_' + di;
         const recKey = id + '_' + di;
@@ -333,12 +437,28 @@ class Component extends DCLogic {
       });
       return {
         key: id,
+        id,
         name,
         initials: initials(name),
-        avatarColor: AVATAR_COLORS[pi % AVATAR_COLORS.length],
+        icon,
+        iconEmpty: !icon,
+        avatarColor,
         days,
-        onNameChange: (e) => this.renamePerson(id, e.target.value),
+        onNameChange: (e) => this.onNameDraftChange(id, e.target.value),
+        onNameBlur: () => this.commitName(id),
         onRemove: () => this.removePerson(id),
+        onDragStart: () => this.onDragStart(id),
+        onDrop: (e) => { e.preventDefault(); this.onDropOn(id); },
+        onDragOver: (e) => e.preventDefault(),
+        onDragEnter: () => this.onDragEnter(id),
+        onDragEnd: () => this.onDragEnd(),
+        rowBorderColor: this.state.dragOverId === id ? 'oklch(0.5 0.15 250)' : theme.borderLight,
+        rowOpacity: this.state.dragId === id ? 0.4 : 1,
+        onAvatarClick: () => this.toggleEditPerson(id),
+        isEditing,
+        colorSwatches,
+        iconChoices,
+        onResetIcon: () => this.setPersonIcon(id, ''),
       };
     });
 
