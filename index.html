@@ -27,6 +27,9 @@
   select.status-select:focus { outline: 2px solid oklch(0.55 0.03 250); outline-offset: 1px; }
   .name-input { border: none; background: transparent; font-size: 14px; font-weight: 600; font-family: inherit; width: 100%; padding: 2px 0; }
   .name-input:focus { outline: none; border-bottom: 1px solid oklch(0.6 0.05 250); }
+  @media print {
+    [data-no-print] { display: none !important; }
+  }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -48,17 +51,32 @@
       <button onClick="{{ nextWeek }}" style="width:36px; height:36px; border-radius:50%; border:1px solid {{ theme.btnBorder }}; background:{{ theme.card }}; color:{{ theme.text }}; font-size:16px; cursor:pointer;">›</button>
       <button onClick="{{ goToday }}" style="margin-left:8px; padding:8px 16px; border-radius:8px; border:1px solid {{ theme.btnBorder }}; background:{{ theme.card }}; color:{{ theme.muted2 }}; font-size:14px; cursor:pointer;">Aujourd'hui</button>
       <button onClick="{{ toggleTheme }}" style="width:36px; height:36px; border-radius:50%; border:1px solid {{ theme.btnBorder }}; background:{{ theme.card }}; color:{{ theme.text }}; font-size:16px; cursor:pointer;" title="Basculer clair / sombre">{{ themeIcon }}</button>
+      <button data-no-print="true" onClick="{{ toggleMinimal }}" title="Vue minimaliste" style="padding:8px 16px; border-radius:8px; border:1px solid {{ theme.btnBorder }}; background:{{ theme.card }}; color:{{ theme.muted2 }}; font-size:14px; cursor:pointer;">{{ minimalToggleLabel }}</button>
+      <button data-no-print="true" onClick="{{ toggleHistory }}" title="Historique" style="width:36px; height:36px; border-radius:50%; border:1px solid {{ theme.btnBorder }}; background:{{ theme.card }}; color:{{ theme.text }}; font-size:16px; cursor:pointer;">🕘</button>
+      <button data-no-print="true" onClick="{{ doPrint }}" title="Exporter / imprimer" style="width:36px; height:36px; border-radius:50%; border:1px solid {{ theme.btnBorder }}; background:{{ theme.card }}; color:{{ theme.text }}; font-size:16px; cursor:pointer;">⬇</button>
     </div>
   </div>
 
+  <sc-if value="{{ showHistory }}" hint-placeholder-val="{{ false }}">
+    <div data-no-print="true" style="margin-bottom:20px; padding:14px 18px; border-radius:12px; border:1px solid {{ theme.border }}; background:{{ theme.card }}; max-height:200px; overflow-y:auto;">
+      <div style="font-size:13px; font-weight:600; margin-bottom:8px;">Historique récent</div>
+      <sc-for list="{{ historyList }}" as="h" hint-placeholder-count="3">
+        <div style="display:flex; justify-content:space-between; gap:12px; font-size:12px; color:{{ theme.muted2 }}; padding:4px 0; border-top:1px solid {{ theme.borderLight }};">
+          <span>{{ h.text }}</span>
+          <span>{{ h.time }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
   <div style="display:flex; align-items:center; flex-wrap:wrap; gap:20px; margin-bottom:20px;">
     <sc-for list="{{ legend }}" as="item" hint-placeholder-count="3">
-      <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:{{ theme.muted2 }};">
+      <button onClick="{{ item.onClick }}" style="display:flex; align-items:center; gap:8px; font-size:14px; color:{{ theme.muted2 }}; border:none; background:transparent; cursor:pointer; padding:4px 8px; border-radius:20px; opacity:{{ item.opacity }};">
         <span style="width:10px; height:10px; border-radius:50%; background:{{ item.dot }}; display:inline-block;"></span>
         {{ item.label }}
-      </div>
+      </button>
     </sc-for>
-    <button onClick="{{ toggleAddStatus }}" style="font-size:13px; padding:6px 12px; border-radius:20px; border:1px dashed {{ theme.btnBorder }}; background:transparent; color:{{ theme.muted2 }}; cursor:pointer;">+ Ajouter un motif</button>
+    <button data-no-print="true" onClick="{{ toggleAddStatus }}" style="font-size:13px; padding:6px 12px; border-radius:20px; border:1px dashed {{ theme.btnBorder }}; background:transparent; color:{{ theme.muted2 }}; cursor:pointer;">+ Ajouter un motif</button>
   </div>
 
   <sc-if value="{{ showAddStatus }}" hint-placeholder-val="{{ false }}">
@@ -78,9 +96,16 @@
     <div style="display:grid; grid-template-columns:240px repeat(5, 1fr) 44px;">
       <div style="padding:16px 20px; font-size:13px; font-weight:600; color:{{ theme.muted }}; border-bottom:1px solid {{ theme.border }}; background:{{ theme.headerBg }};">Membre</div>
       <sc-for list="{{ weekDays }}" as="day" hint-placeholder-count="5">
-        <div style="padding:16px 12px; text-align:center; border-bottom:1px solid {{ theme.border }}; border-left:1px solid {{ theme.borderLight }}; background:{{ theme.headerBg }};">
-          <div style="font-size:13px; font-weight:600; text-transform:capitalize;">{{ day.name }}</div>
+        <div style="padding:16px 12px; text-align:center; border-bottom:1px solid {{ theme.border }}; border-left:1px solid {{ theme.borderLight }}; background:{{ day.headerBg }};">
+          <div style="font-size:13px; font-weight:700; text-transform:capitalize; color:{{ day.nameColor }};">{{ day.name }}</div>
           <div style="font-size:12px; color:{{ theme.muted2 }}; margin-top:2px;">{{ day.dateLabel }}</div>
+          <div style="display:flex; justify-content:center; gap:6px; margin-top:6px; flex-wrap:wrap;">
+            <sc-for list="{{ day.summary }}" as="sp" hint-placeholder-count="2">
+              <span style="display:flex; align-items:center; gap:3px; font-size:11px; color:{{ theme.muted2 }};">
+                <span style="width:6px; height:6px; border-radius:50%; background:{{ sp.dot }}; display:inline-block;"></span>{{ sp.n }}
+              </span>
+            </sc-for>
+          </div>
         </div>
       </sc-for>
       <div style="border-bottom:1px solid {{ theme.border }}; background:{{ theme.headerBg }};"></div>
@@ -96,20 +121,20 @@
           </div>
           <input class="name-input" type="text" value="{{ person.name }}" onChange="{{ person.onNameChange }}" onBlur="{{ person.onNameBlur }}" style="color:{{ theme.text }};"></input>
           <sc-if value="{{ person.isEditing }}" hint-placeholder-val="{{ false }}">
-            <div style="position:absolute; z-index:10; top:100%; left:20px; margin-top:4px; padding:12px; border-radius:10px; background:{{ theme.card }}; border:1px solid {{ theme.border }}; box-shadow:0 6px 20px rgba(0,0,0,0.15); width:220px;">
+            <div data-person-editor="{{ person.id }}" style="position:absolute; z-index:10; top:100%; left:20px; margin-top:4px; padding:12px; border-radius:10px; background:{{ theme.card }}; border:1px solid {{ theme.border }}; box-shadow:0 6px 20px rgba(0,0,0,0.15); width:220px;">
               <div style="font-size:11px; color:{{ theme.muted2 }}; margin-bottom:6px;">Couleur</div>
               <div style="display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap;">
                 <sc-for list="{{ person.colorSwatches }}" as="sw" hint-placeholder-count="7">
-                  <button onClick="{{ sw.onSelect }}" style="width:22px; height:22px; border-radius:50%; border:none; background:{{ sw.color }}; box-shadow:{{ sw.ring }}; cursor:pointer;"></button>
+                  <button type="button" onClick="{{ sw.onSelect }}" style="width:22px; height:22px; border-radius:50%; border:none; background:{{ sw.color }}; box-shadow:{{ sw.ring }}; cursor:pointer;"></button>
                 </sc-for>
               </div>
               <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
                 <div style="font-size:11px; color:{{ theme.muted2 }};">Icône</div>
-                <button onClick="{{ person.onResetIcon }}" style="font-size:11px; border:none; background:transparent; color:{{ theme.muted2 }}; text-decoration:underline; cursor:pointer; padding:0;">Revenir aux lettres</button>
+                <button type="button" onClick="{{ person.onResetIcon }}" style="font-size:11px; border:none; background:transparent; color:{{ theme.muted2 }}; text-decoration:underline; cursor:pointer; padding:0;">Revenir aux lettres</button>
               </div>
               <div style="display:flex; gap:4px; flex-wrap:wrap;">
                 <sc-for list="{{ person.iconChoices }}" as="ic" hint-placeholder-count="6">
-                  <button onClick="{{ ic.onSelect }}" style="width:24px; height:24px; border-radius:6px; border:none; background:transparent; font-size:14px; cursor:pointer;">{{ ic.icon }}</button>
+                  <button type="button" onClick="{{ ic.onSelect }}" style="width:24px; height:24px; border-radius:6px; border:none; background:transparent; font-size:14px; cursor:pointer;">{{ ic.icon }}</button>
                 </sc-for>
               </div>
             </div>
@@ -117,17 +142,16 @@
         </div>
         <sc-for list="{{ person.days }}" as="cell" hint-placeholder-count="5">
           <div style="padding:10px; position:relative; border-left:1px solid {{ theme.borderLight }};">
-            <select class="status-select" value="{{ cell.status }}" onChange="{{ cell.onChange }}" style="width:100%; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; background:{{ cell.bg }}; color:{{ cell.color }};">
-              <sc-for list="{{ statusOptions }}" as="opt" hint-placeholder-count="3">
-                <option value="{{ opt.value }}">{{ opt.label }}</option>
-              </sc-for>
-            </select>
-            <sc-if value="{{ cell.recurringLabel }}" hint-placeholder-val="{{ false }}">
-              <div style="display:flex; align-items:center; gap:4px; margin-top:4px; font-size:11px; color:{{ theme.muted2 }};">
-                🔁 {{ cell.recurringLabel }}
-                <button onClick="{{ cell.onRemoveRecurring }}" style="border:none; background:transparent; color:{{ theme.muted2 }}; cursor:pointer; font-size:11px; text-decoration:underline; padding:0;">retirer</button>
-              </div>
-            </sc-if>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <select class="status-select" value="{{ cell.status }}" onChange="{{ cell.onChange }}" style="flex:1; min-width:0; padding:8px 10px; border-radius:8px; font-size:13px; font-weight:600; background:{{ cell.bg }}; color:{{ cell.color }}; opacity:{{ cell.opacity }}; box-shadow:{{ cell.dotRing }};">
+                <sc-for list="{{ cell.cellOptions }}" as="opt" hint-placeholder-count="3">
+                  <option value="{{ opt.value }}" onClick="{{ opt.onPick }}">{{ opt.label }}</option>
+                </sc-for>
+              </select>
+              <sc-if value="{{ cell.recurringLabel }}" hint-placeholder-val="{{ false }}">
+                <button type="button" onClick="{{ cell.onRemoveRecurring }}" title="{{ cell.recurringLabel }} — cliquer pour retirer" style="flex-shrink:0; width:22px; height:22px; border-radius:50%; border:none; background:{{ cell.color }}; color:{{ cell.bg }}; font-size:11px; line-height:1; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0;">↻</button>
+              </sc-if>
+            </div>
             <sc-if value="{{ cell.showConfirm }}" hint-placeholder-val="{{ false }}">
               <div style="position:absolute; z-index:10; top:100%; left:10px; right:10px; margin-top:4px; padding:10px; border-radius:10px; background:{{ theme.card }}; border:1px solid {{ theme.border }}; box-shadow:0 6px 20px rgba(0,0,0,0.12);">
                 <div style="font-size:12px; margin-bottom:8px;">Appliquer chaque {{ cell.dayName }} ?</div>
@@ -140,12 +164,12 @@
           </div>
         </sc-for>
         <div style="display:flex; align-items:center; justify-content:center;">
-          <button onClick="{{ person.onRemove }}" title="Supprimer" style="width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:{{ theme.muted }}; font-size:16px; cursor:pointer;">×</button>
+          <button data-no-print="true" onClick="{{ person.onRemove }}" title="Supprimer" style="width:26px; height:26px; border-radius:50%; border:none; background:transparent; color:{{ theme.muted }}; font-size:16px; cursor:pointer;">×</button>
         </div>
       </div>
     </sc-for>
 
-    <div style="border-top:1px solid {{ theme.borderLight }}; padding:14px 20px;">
+    <div style="border-top:1px solid {{ theme.borderLight }}; padding:14px 20px;" data-no-print="true">
       <button onClick="{{ addPerson }}" style="font-size:13px; padding:8px 16px; border-radius:8px; border:1px dashed {{ theme.btnBorder }}; background:transparent; color:{{ theme.muted2 }}; cursor:pointer;">+ Ajouter un membre</button>
     </div>
   </div>
@@ -227,14 +251,29 @@ class Component extends DCLogic {
     dragOverId: null,
     liveOrder: null,
     nameDrafts: {},
+    minimal: false,
+    filterStatus: 'all',
+    showHistory: false,
+    history: {},
   };
 
   componentDidUpdate() {
     document.body.style.background = THEME[this.state.theme].page;
   }
 
+  handleDocClick = (e) => {
+    if (this.state.editingPersonId && !e.target.closest('[data-person-editor]')) {
+      this.setState({ editingPersonId: null });
+    }
+  };
+
+  componentWillUnmount() {
+    document.removeEventListener('mousedown', this.handleDocClick);
+  }
+
   async componentDidMount() {
     document.body.style.background = THEME[this.state.theme].page;
+    document.addEventListener('mousedown', this.handleDocClick);
     try {
       await waitForFirebase();
       if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
@@ -245,7 +284,7 @@ class Component extends DCLogic {
           const seedPeople = {};
           PEOPLE_SEED.forEach((name, i) => { seedPeople[i] = { name }; });
           const order = PEOPLE_SEED.map((_, i) => String(i));
-          this.dbRef.set({ people: seedPeople, nextPersonId: PEOPLE_SEED.length, statuses: {}, customStatuses: {}, recurring: {}, order });
+          this.dbRef.set({ people: seedPeople, nextPersonId: PEOPLE_SEED.length, statuses: {}, customStatuses: {}, recurring: {}, order, history: {} });
           return;
         }
         const rawPeople = data.people || {};
@@ -266,6 +305,7 @@ class Component extends DCLogic {
           statuses: data.statuses || {},
           customStatuses: data.customStatuses || {},
           recurring: data.recurring || {},
+          history: data.history || {},
           synced: true,
         });
       });
@@ -278,6 +318,15 @@ class Component extends DCLogic {
   nextWeek = () => this.setState(s => ({ weekOffset: s.weekOffset + 1 }));
   goToday = () => this.setState({ weekOffset: 0 });
   toggleTheme = () => this.setState(s => ({ theme: s.theme === 'light' ? 'dark' : 'light' }));
+  toggleMinimal = () => this.setState(s => ({ minimal: !s.minimal }));
+  setFilterStatus = (key) => this.setState(s => ({ filterStatus: s.filterStatus === key ? 'all' : key }));
+  toggleHistory = () => this.setState(s => ({ showHistory: !s.showHistory }));
+  doPrint = () => window.print();
+
+  logHistory(text) {
+    if (!this.dbRef) return;
+    this.dbRef.child('history').push({ text, ts: Date.now() });
+  }
   toggleAddStatus = () => this.setState(s => ({ showAddStatus: !s.showAddStatus, newStatusLabel: '', newStatusHue: SWATCH_HUES[0] }));
 
   confirmAddStatus = () => {
@@ -294,12 +343,15 @@ class Component extends DCLogic {
     this.dbRef.child('people/' + id).set({ name: 'Nouveau membre' });
     this.dbRef.child('nextPersonId').set(this.state.nextPersonId + 1);
     this.dbRef.child('order').set([...this.state.order, id]);
+    this.logHistory('Membre ajouté');
   };
 
   removePerson(id) {
     if (!this.dbRef) return;
+    const pName = (this.state.people[id] && this.state.people[id].name) || 'Membre';
     this.dbRef.child('people/' + id).remove();
     this.dbRef.child('order').set(this.state.order.filter(o => o !== id));
+    this.logHistory(pName + ' supprimé(e)');
   }
 
   onNameDraftChange(id, value) {
@@ -329,7 +381,8 @@ class Component extends DCLogic {
     else this.dbRef.child('people/' + id + '/icon').remove();
   }
 
-  toggleEditPerson(id) {
+  toggleEditPerson(id, e) {
+    if (e) e.stopPropagation();
     this.setState(s => ({ editingPersonId: s.editingPersonId === id ? null : id }));
   }
 
@@ -355,6 +408,9 @@ class Component extends DCLogic {
     const key = this.state.weekOffset + '_' + personId + '_' + dayIdx;
     this.dbRef.child('statuses/' + key).set(value);
     this.setState({ confirmCell: { personId, dayIdx, value } });
+    const pName = (this.state.people[personId] && this.state.people[personId].name) || 'Quelqu\'un';
+    const label = (BASE_STATUSES.find(s => s.key === value) || {}).label || value;
+    this.logHistory(pName + ' → ' + label);
   }
 
   confirmRecurring(apply) {
@@ -381,12 +437,19 @@ class Component extends DCLogic {
     const customList = Object.keys(this.state.customStatuses).map(key => ({ key, ...this.state.customStatuses[key] }));
     const allStatuses = [...BASE_STATUSES, ...customList];
 
+    const today = new Date();
+    const todayDayIdx = this.state.weekOffset === 0 ? (today.getDay() + 6) % 7 : -1;
+
     const monday = startOfWeek(new Date());
     monday.setDate(monday.getDate() + this.state.weekOffset * 7);
     const weekDays = DAY_NAMES.map((name, i) => {
       const d = new Date(monday);
       d.setDate(d.getDate() + i);
-      return { name, dateLabel: d.getDate() + ' ' + MONTHS[d.getMonth()], key: i };
+      return {
+        name, dateLabel: d.getDate() + ' ' + MONTHS[d.getMonth()], key: i, isToday: i === todayDayIdx,
+        headerBg: i === todayDayIdx ? (isDark ? 'oklch(0.3 0.05 250)' : 'oklch(0.92 0.04 250)') : theme.headerBg,
+        nameColor: i === todayDayIdx ? (isDark ? 'oklch(0.85 0.06 250)' : 'oklch(0.4 0.09 250)') : theme.text,
+      };
     });
     const friday = new Date(monday);
     friday.setDate(friday.getDate() + 4);
@@ -423,9 +486,16 @@ class Component extends DCLogic {
         const c = statusColors(def.hue, isDark);
         const cc = this.state.confirmCell;
         const showConfirm = cc && cc.personId === id && cc.dayIdx === di;
+        const dimmed = this.state.filterStatus !== 'all' && this.state.filterStatus !== statusKey;
+        const cellBg = this.state.minimal ? theme.card : c.bg;
+        const cellColor = this.state.minimal ? theme.text : c.color;
         return {
-          key: id + '_' + di, status: statusKey, bg: c.bg, color: c.color,
+          key: id + '_' + di, status: statusKey, bg: cellBg, color: cellColor,
+          dotColor: c.dot, minimal: this.state.minimal,
+          opacity: dimmed ? 0.3 : 1,
+          dotRing: this.state.minimal ? ('inset 0 0 0 2px ' + c.dot) : 'none',
           onChange: (e) => this.setStatus(id, di, e.target.value),
+          cellOptions: allStatuses.map(s => ({ value: s.key, label: s.label, onPick: () => this.setStatus(id, di, s.key) })),
           isRecurring,
           recurringLabel: isRecurring ? 'Récurrent chaque ' + wd.name : null,
           onRemoveRecurring: () => this.removeRecurring(id, di, statusKey),
@@ -454,7 +524,7 @@ class Component extends DCLogic {
         onDragEnd: () => this.onDragEnd(),
         rowBorderColor: this.state.dragOverId === id ? 'oklch(0.5 0.15 250)' : theme.borderLight,
         rowOpacity: this.state.dragId === id ? 0.4 : 1,
-        onAvatarClick: () => this.toggleEditPerson(id),
+        onAvatarClick: (e) => this.toggleEditPerson(id, e),
         isEditing,
         colorSwatches,
         iconChoices,
@@ -462,8 +532,27 @@ class Component extends DCLogic {
       };
     });
 
+    const daySummaries = weekDays.map((wd, di) => {
+      const counts = {};
+      people.forEach(p => { const st = p.days[di].status; counts[st] = (counts[st] || 0) + 1; });
+      const summary = allStatuses
+        .map(s => ({ n: counts[s.key] || 0, dot: statusColors(s.hue, isDark).dot }))
+        .filter(x => x.n > 0);
+      weekDays[di].summary = summary;
+      return { key: di, summary };
+    });
+
     const statusOptions = allStatuses.map(s => ({ value: s.key, label: s.label }));
-    const legend = allStatuses.map(s => ({ label: s.label, dot: statusColors(s.hue, isDark).dot }));
+    const legend = allStatuses.map(s => ({
+      key: s.key, label: s.label, dot: statusColors(s.hue, isDark).dot,
+      opacity: this.state.filterStatus === 'all' || this.state.filterStatus === s.key ? 1 : 0.4,
+      onClick: () => this.setFilterStatus(s.key),
+    }));
+    const historyList = Object.keys(this.state.history)
+      .map(k => this.state.history[k])
+      .sort((a, b) => b.ts - a.ts)
+      .slice(0, 20)
+      .map((h, i) => ({ key: i, text: h.text, time: new Date(h.ts).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) }));
     const hueSwatches = SWATCH_HUES.map(hue => ({
       dot: statusColors(hue, isDark).dot,
       ring: hue === this.state.newStatusHue ? '0 0 0 2px white, 0 0 0 4px oklch(0.5 0.05 250)' : 'none',
@@ -474,13 +563,17 @@ class Component extends DCLogic {
       theme, themeIcon: isDark ? '☀' : '☾',
       syncDot: this.state.synced ? 'oklch(0.65 0.14 145)' : 'oklch(0.7 0.14 70)',
       syncLabel: this.state.synced ? 'Synchronisé' : 'Connexion…',
-      weekLabel, weekDays, people, statusOptions, legend,
+      weekLabel, weekDays, people, statusOptions, legend, daySummaries,
       showAddStatus: this.state.showAddStatus, newStatusLabel: this.state.newStatusLabel,
       hueSwatches,
       prevWeek: this.prevWeek, nextWeek: this.nextWeek, goToday: this.goToday,
       toggleTheme: this.toggleTheme, toggleAddStatus: this.toggleAddStatus,
       confirmAddStatus: this.confirmAddStatus, addPerson: this.addPerson,
       onNewStatusLabelChange: (e) => this.setState({ newStatusLabel: e.target.value }),
+      minimal: this.state.minimal, toggleMinimal: this.toggleMinimal,
+      minimalToggleLabel: this.state.minimal ? 'Vue détaillée' : 'Vue minimaliste',
+      doPrint: this.doPrint,
+      showHistory: this.state.showHistory, toggleHistory: this.toggleHistory, historyList,
     };
   }
 }
